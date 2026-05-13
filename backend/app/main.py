@@ -32,12 +32,18 @@ def crear_estacion(estacion: schemas.EstacionCreate, db: Session = Depends(datab
 
 @app.post("/lecturas/", tags=["Telemetría"])
 def registrar_lectura(lectura: schemas.LecturaCreate, db: Session = Depends(database.get_db), user=Depends(auth.validar_token)):
-    # Reto Maestro: Validación de existencia
+    
+    # Actualizado las lecturas para que manden los datos a ultimo_valor
     estacion = db.query(models.EstacionDB).filter(models.EstacionDB.id == lectura.estacion_id).first()
+    
     if not estacion:
         raise HTTPException(status_code=404, detail="Estación no encontrada")
+        
+    estacion.ultimo_valor = lectura.valor
     
     nueva_lectura = models.LecturaDB(**lectura.dict())
     db.add(nueva_lectura)
+    
     db.commit()
+    
     return {"status": "Lectura registrada con éxito"}

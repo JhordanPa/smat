@@ -5,6 +5,7 @@ from datetime import datetime
 class EstacionBase(BaseModel):
     nombre: str
     ubicacion: str
+    ultimo_valor: Optional[float] = None # Se envia el dato ultimo_valor
 
 class EstacionCreate(EstacionBase):
     pass

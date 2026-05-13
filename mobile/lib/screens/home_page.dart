@@ -22,11 +22,46 @@ class _HomePageState extends State<HomePage> {
     _cargarEstaciones();
   }
 
+  
+
   // Función que llama al ApiService para descargar los datos
   void _cargarEstaciones() {
     setState(() {
       _futureEstaciones = ApiService().fetchEstaciones();
     });
+  }
+
+  void _mostrarDialogoEdicion(Estacion estacion) {
+    final nombreCtrl = TextEditingController(text: estacion.nombre);
+    final ubicacionCtrl = TextEditingController(text: estacion.ubicacion);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Editar Estación"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nombreCtrl, decoration: const InputDecoration(labelText: "Nombre")),
+            TextField(controller: ubicacionCtrl, decoration: const InputDecoration(labelText: "Ubicación")),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () async {
+              bool ok = await ApiService().editarEstacion(estacion.id, nombreCtrl.text, ubicacionCtrl.text);
+              if (ok) {
+                if (!context.mounted) return;
+                Navigator.pop(context); // Cierra la ventana emergente
+                _cargarEstaciones(); // Vuelve a descargar los datos actualizados
+              }
+            },
+            child: const Text("Guardar"),
+          )
+        ],
+      ),
+    );
   }
 
   @override
@@ -38,12 +73,12 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              // 1. Borramos el token de la memoria
+              // Borramos el token de la memoria
               await AuthService().logout();
               
               if (!context.mounted) return;
 
-              // 2. Reinicia la navegación al Login y borra el historial
+              // Reinicia la pagina y devuelve a la pagina de inicio de sesion
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -53,31 +88,77 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      // FutureBuilder para mostrar una bolita de carga mientras llegan los datos
-      body: FutureBuilder<List<Estacion>>(
-        future: _futureEstaciones,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No hay estaciones registradas aún.'));
-          }
 
-          final estaciones = snapshot.data!;
-          return ListView.builder(
-            itemCount: estaciones.length,
-            itemBuilder: (context, index) {
-              final estacion = estaciones[index];
-              return ListTile(
-                leading: const Icon(Icons.sensors, color: Colors.blue),
-                title: Text(estacion.nombre),
-                subtitle: Text(estacion.ubicacion),
-              );
-            },
-          );
+
+      // FutureBuilder para mostrar una bolita de carga mientras llegan los datos
+      body: RefreshIndicator(
+        onRefresh: () async {
+          _cargarEstaciones();
         },
+        child: FutureBuilder<List<Estacion>>(
+          future: _futureEstaciones,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('No hay estaciones registradas aún.'));
+            }
+        
+            final estaciones = snapshot.data!;
+            return ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: estaciones.length,
+              itemBuilder: (context, index) {
+                final estacion = estaciones[index];
+
+                //Reto del Color
+
+                Color colorDelSensor = Colors.blue;
+                if (estacion.ultimoValor != null) {
+                  if (estacion.ultimoValor! > 50) {
+                    colorDelSensor = Colors.red;
+                  } else {
+                    colorDelSensor = Colors.green;
+                  }
+                }
+        
+                //
+                
+                return Dismissible(
+                  key: Key(estacion.id.toString()),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    color: Colors.red,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  onDismissed: (direction) async {
+                    // Usamos ApiService() con mayúscula
+                    bool ok = await ApiService().eliminarEstacion(estacion.id);
+                    if (ok) {
+                      // Refrescamos la lista si se borró con éxito
+                      _cargarEstaciones();
+                      
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("${estacion.nombre} eliminada")),
+                      );
+                    }
+                  },
+                  child: ListTile(
+                    leading: Icon(Icons.sensors, color: colorDelSensor),
+                    title: Text(estacion.nombre),
+                    subtitle: Text(estacion.ubicacion),
+                    onTap: () => _mostrarDialogoEdicion(estacion), // Siguiente paso
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
       // Botón flotante para ir a la pantalla de crear una nueva estación
       floatingActionButton: FloatingActionButton(

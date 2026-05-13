@@ -30,4 +30,28 @@ class ApiService {
     );
     return response.statusCode == 200;
   }
+
+  // Eliminar una estación
+  Future<bool> eliminarEstacion(int id) async {
+    final token = await AuthService().getToken();
+    final response = await http.delete(
+      Uri.parse('$baseUrl/estaciones/$id'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    return response.statusCode == 200;
+  }
+
+  // Actualizar una estación existente
+  Future<bool> editarEstacion(int id, String nombre, String ubicacion) async {
+    final token = await AuthService().getToken();
+    final response = await http.put(
+      Uri.parse('$baseUrl/estaciones/$id'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'nombre': nombre, 'ubicacion': ubicacion}),
+    );
+    return response.statusCode == 200;
+  }
 }

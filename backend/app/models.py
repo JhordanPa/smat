@@ -8,6 +8,7 @@ class EstacionDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, unique=True)
     ubicacion = Column(String)
+    ultimo_valor = Column(Float, nullable=True)
     lecturas = relationship("LecturaDB", back_populates="estacion")
 
 class LecturaDB(Base):
